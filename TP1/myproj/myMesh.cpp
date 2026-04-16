@@ -138,7 +138,19 @@ bool myMesh::readFile(std::string filename)
 
 void myMesh::computeNormals()
 {
-	/**** TODO ****/
+	for (unsigned int f = 0; f < faces.size(); f++)
+	{
+		if (faces[f]) {
+			faces[f]->computeNormal();
+		}
+	}
+
+	for (unsigned int v = 0; v < vertices.size(); v++)
+	{
+		if (vertices[v]) {
+			vertices[v]->computeNormal();
+		}
+	}
 }
 
 void myMesh::normalize()

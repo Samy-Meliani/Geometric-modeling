@@ -19,7 +19,6 @@ void myFace::computeNormal()
 {
     if (!adjacent_halfedge) return;
 
-    // Récupérer les positions de trois sommets consécutifs pour définir deux vecteurs
     myPoint3D* p1 = adjacent_halfedge->source->point;
     myPoint3D* p2 = adjacent_halfedge->next->source->point;
     myPoint3D* p3 = adjacent_halfedge->next->next->source->point;
