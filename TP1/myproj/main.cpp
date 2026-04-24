@@ -381,7 +381,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("dolphin.obj")) {
+	if (m->readFile("Goomba.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}
