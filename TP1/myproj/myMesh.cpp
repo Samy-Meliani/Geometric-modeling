@@ -214,13 +214,89 @@ void myMesh::subdivisionCatmullClark()
 
 void myMesh::triangulate()
 {
-	/**** TODO ****/
+	vector<myFace*> originalFaces = faces;
+
+	for (unsigned int i = 0; i < originalFaces.size(); i++) {
+		if (originalFaces[i]) {
+			triangulate(originalFaces[i]);
+		}
+	}
 }
 
 //return false if already triangle, true othewise.
-bool myMesh::triangulate(myFace *f)
+bool myMesh::triangulate(myFace* f)
 {
-	/**** TODO ****/
-	return false;
+	if (!f || !f->adjacent_halfedge) return false;
+
+	vector<myHalfedge*> originalEdges;
+	myHalfedge* curr = f->adjacent_halfedge;
+	do {
+		originalEdges.push_back(curr);
+		curr = curr->next;
+	} while (curr != f->adjacent_halfedge);
+
+	int n = originalEdges.size();
+
+	if (n <= 3) return false;
+
+	myPoint3D* centerPos = new myPoint3D(0.0, 0.0, 0.0);
+	for (int i = 0; i < n; i++) {
+		*centerPos += *(originalEdges[i]->source->point);
+	}
+	*centerPos /= (double)n;
+
+	myVertex* vCenter = new myVertex();
+	vCenter->point = centerPos;
+	vertices.push_back(vCenter);
+
+	vector<myHalfedge*> toCenter(n);
+	vector<myHalfedge*> fromCenter(n);
+	vector<myFace*> newFaces(n);
+
+	for (int i = 0; i < n; i++) {
+		toCenter[i] = new myHalfedge();
+		fromCenter[i] = new myHalfedge();
+
+		halfedges.push_back(toCenter[i]);
+		halfedges.push_back(fromCenter[i]);
+
+		if (i == 0) {
+			newFaces[i] = f; 
+		}
+		else {
+			newFaces[i] = new myFace();
+			faces.push_back(newFaces[i]); 
+		}
+	}
+
+	for (int i = 0; i < n; i++) {
+		int next_i = (i + 1) % n;
+		myHalfedge* e = originalEdges[i];
+		myFace* curFace = newFaces[i];
+
+		toCenter[i]->source = originalEdges[next_i]->source;
+		fromCenter[i]->source = vCenter;
+
+		toCenter[i]->twin = fromCenter[next_i];
+		fromCenter[next_i]->twin = toCenter[i];
+
+		e->next = toCenter[i];
+		toCenter[i]->prev = e;
+
+		toCenter[i]->next = fromCenter[i];
+		fromCenter[i]->prev = toCenter[i];
+
+		fromCenter[i]->next = e;
+		e->prev = fromCenter[i];
+
+		e->adjacent_face = curFace;
+		toCenter[i]->adjacent_face = curFace;
+		fromCenter[i]->adjacent_face = curFace;
+		curFace->adjacent_halfedge = e;
+	}
+
+	vCenter->originof = fromCenter[0];
+
+	return true; 
 }
 
