@@ -165,6 +165,29 @@ void menu(int item)
 			exit(0);
 			break;
 		}
+	case MENU_GENERATE:
+	{
+
+		std::vector<myPoint3D*> profil2D;
+		profil2D.push_back(new myPoint3D(0.8, -2.0, 0.0)); 
+		profil2D.push_back(new myPoint3D(0.3, -1.5, 0.0)); 
+		profil2D.push_back(new myPoint3D(0.3, -0.5, 0.0)); 
+		profil2D.push_back(new myPoint3D(1.2, 0.5, 0.0)); 
+		profil2D.push_back(new myPoint3D(0.6, 1.5, 0.0)); 
+		profil2D.push_back(new myPoint3D(0.9, 2.0, 0.0)); 
+
+		myVector3D axeY(0.0, 1.0, 0.0);
+		int subdivisions = 30; 
+
+		m->SurfaceDeRevolution(profil2D, subdivisions, axeY);
+
+		for (auto p : profil2D) {
+			delete p;
+		}
+
+		makeBuffers(m);
+		break;
+	}
 	}
 	glutPostRedisplay();
 }
@@ -172,10 +195,8 @@ void menu(int item)
 
 
 
-//This function is called to display objects on screen.
 void display() 
 {
-	//Clearing the color on the screen.
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glViewport(0, 0, Glut_w, Glut_h);
@@ -381,7 +402,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("Goomba.obj")) {
+	if (m->readFile("dolphin.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}

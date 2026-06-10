@@ -300,3 +300,81 @@ bool myMesh::triangulate(myFace* f)
 	return true; 
 }
 
+void myMesh::SurfaceDeRevolution(std::vector<myPoint3D*> profile, int slices, myVector3D axis)
+{
+	clear(); 
+
+	int N = profile.size();
+	if (N < 2 || slices < 3) return;
+
+	const double pipi = 3.14;
+
+	std::vector<std::vector<myVertex*>> grid(N, std::vector<myVertex*>(slices));
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < slices; j++) {
+			double theta = (2.0 * pipi * j) / slices;
+
+			myPoint3D* p = new myPoint3D(profile[i]->X, profile[i]->Y, profile[i]->Z);
+			p->rotate(axis, theta); 
+			myVertex* v = new myVertex();
+			v->point = p;
+			v->index = vertices.size();
+
+			grid[i][j] = v;
+			vertices.push_back(v);
+		}
+	}
+
+	std::map<std::pair<int, int>, myHalfedge*> twin_map;
+
+	for (int i = 0; i < N - 1; i++) {
+		for (int j = 0; j < slices; j++) {
+
+			int next_j = (j + 1) % slices;
+
+			myVertex* v0 = grid[i][j];
+			myVertex* v1 = grid[i + 1][j];
+			myVertex* v2 = grid[i + 1][next_j];
+			myVertex* v3 = grid[i][next_j];
+
+			std::vector<myVertex*> face_verts = { v0, v1, v2, v3 };
+			int num_verts = 4;
+			myHalfedge** hedges = new myHalfedge * [num_verts];
+			for (int k = 0; k < num_verts; k++) {
+				hedges[k] = new myHalfedge();
+			}
+			myFace* f = new myFace();
+			f->adjacent_halfedge = hedges[0];
+			for (int k = 0; k < num_verts; k++) {
+				int k_next = (k + 1) % num_verts;
+				int k_prev = (k - 1 + num_verts) % num_verts;
+				hedges[k]->next = hedges[k_next];
+				hedges[k]->prev = hedges[k_prev];
+				hedges[k]->adjacent_face = f;
+				myVertex* start_v = face_verts[k];
+				myVertex* end_v = face_verts[k_next];
+				hedges[k]->source = start_v;
+				start_v->originof = hedges[k];
+				std::pair<int, int> edge_key = std::make_pair(start_v->index, end_v->index);
+				std::pair<int, int> twin_key = std::make_pair(end_v->index, start_v->index);
+				auto it = twin_map.find(twin_key);
+				if (it != twin_map.end()) {
+					hedges[k]->twin = it->second;
+					it->second->twin = hedges[k];
+				}
+				else {
+					twin_map[edge_key] = hedges[k];
+				}
+
+				halfedges.push_back(hedges[k]);
+			}
+
+			faces.push_back(f);
+			delete[] hedges;
+		}
+	}
+
+	computeNormals();
+	normalize();
+}

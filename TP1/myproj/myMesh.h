@@ -28,6 +28,8 @@ public:
 	void triangulate();
 	bool triangulate(myFace *);
 
+	void SurfaceDeRevolution(std::vector<myPoint3D*> profile, int slices, myVector3D axis);
+
 	void clear();
 
 	myMesh(void);
