@@ -32,6 +32,8 @@ public:
 
 	void clear();
 
+	void reduce_shortest();
+	void apply_collapse(myHalfedge*);
 	myMesh(void);
 	~myMesh(void);
 };

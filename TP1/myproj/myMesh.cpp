@@ -378,3 +378,137 @@ void myMesh::SurfaceDeRevolution(std::vector<myPoint3D*> profile, int slices, my
 	computeNormals();
 	normalize();
 }
+
+void myMesh::reduce_shortest() {
+	if (halfedges.empty() || faces.size() < 10) {
+		return;
+	}
+
+	myHalfedge* sml = NULL;
+	double minD = 99999.0;
+
+	for (size_t i = 0; i < halfedges.size(); i++) {
+		if (halfedges[i] == NULL || halfedges[i]->twin == NULL) {
+			continue;
+		}
+
+		double l = halfedges[i]->source->point->dist(*(halfedges[i]->twin->source->point));
+		if (l < minD) {
+			minD = l;
+			sml = halfedges[i];
+		}
+	}
+
+	if (sml != NULL) {
+		apply_collapse(sml);
+		computeNormals();
+	}
+}
+
+void myMesh::apply_collapse(myHalfedge* h) {
+	if (h == NULL || h->twin == NULL) {
+		return;
+	}
+
+	myVertex* v_dead = h->source;
+	myVertex* v_keep = h->twin->source;
+
+	myFace* f_l = h->adjacent_face;
+	myFace* f_r = h->twin->adjacent_face;
+	myHalfedge* en = h->next;
+	myHalfedge* ep = h->prev;
+	myHalfedge* tn = h->twin->next;
+	myHalfedge* tp = h->twin->prev;
+
+	myHalfedge* en_twin = NULL;
+	if (en != NULL) { en_twin = en->twin; }
+	myHalfedge* ep_twin = NULL;
+	if (ep != NULL) { ep_twin = ep->twin; }
+	myHalfedge* tn_twin = NULL;
+	if (tn != NULL) { tn_twin = tn->twin; }
+	myHalfedge* tp_twin = NULL;
+	if (tp != NULL) { tp_twin = tp->twin; }
+
+	v_keep->point->X = (v_keep->point->X + v_dead->point->X) * 0.5;
+	v_keep->point->Y = (v_keep->point->Y + v_dead->point->Y) * 0.5;
+	v_keep->point->Z = (v_keep->point->Z + v_dead->point->Z) * 0.5;
+
+	for (size_t i = 0; i < halfedges.size(); i++) {
+		if (halfedges[i] != NULL) {
+			if (halfedges[i]->source == v_dead) {
+				halfedges[i]->source = v_keep;
+			}
+		}
+	}
+
+	if (en_twin != NULL && ep_twin != NULL) {
+		en_twin->twin = ep_twin;
+		ep_twin->twin = en_twin;
+	}
+
+	if (tn_twin != NULL && tp_twin != NULL) {
+		tn_twin->twin = tp_twin;
+		tp_twin->twin = tn_twin;
+	}
+
+	for (auto it = faces.begin(); it != faces.end(); ) {
+		if (*it == f_l || *it == f_r) {
+			if (*it != NULL) {
+				delete* it;
+			}
+			it = faces.erase(it);
+		}
+		else {
+			it++;
+		}
+	}
+
+	for (auto it = halfedges.begin(); it != halfedges.end(); ) {
+		myHalfedge* cur = *it;
+		if (cur == h || cur == h->twin || cur == en || cur == ep || cur == tn || cur == tp) {
+			if (*it != NULL) {
+				delete* it;
+			}
+			it = halfedges.erase(it);
+		}
+		else {
+			it++;
+		}
+	}
+
+	for (auto it = vertices.begin(); it != vertices.end(); ) {
+		if (*it == v_dead) {
+			if (*it != NULL) {
+				delete* it;
+			}
+			it = vertices.erase(it);
+			break;
+		}
+		else {
+			it++;
+		}
+	}
+
+	for (size_t i = 0; i < vertices.size(); i++) {
+		if (vertices[i] != NULL) {
+			myHalfedge* o = vertices[i]->originof;
+			if (o == NULL || o == h || o == h->twin || o == en || o == ep || o == tn || o == tp) {
+				vertices[i]->originof = NULL;
+				for (size_t j = 0; j < halfedges.size(); j++) {
+					if (halfedges[j] != NULL) {
+						if (halfedges[j]->source == vertices[i]) {
+							vertices[i]->originof = halfedges[j];
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for (unsigned int i = 0; i < vertices.size(); i++) {
+		if (vertices[i] != NULL) {
+			vertices[i]->index = i;
+		}
+	}
+}

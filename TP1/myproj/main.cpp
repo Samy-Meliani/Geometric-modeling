@@ -188,6 +188,13 @@ void menu(int item)
 		makeBuffers(m);
 		break;
 	}
+	case MENU_SIMPLIFY: {
+		for (int k = 0; k < 30; k++) {
+			m->reduce_shortest();
+		}
+		makeBuffers(m);
+		break;
+	}
 	}
 	glutPostRedisplay();
 }
@@ -402,7 +409,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("dolphin.obj")) {
+	if (m->readFile("apple.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}
