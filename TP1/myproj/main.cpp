@@ -409,7 +409,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("apple.obj")) {
+	if (m->readFile("cube.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}

@@ -208,7 +208,187 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 
 void myMesh::subdivisionCatmullClark()
 {
-	/**** TODO ****/
+	if (faces.empty() || halfedges.empty()) {
+		return;
+	}
+	vector<myVertex*> liste_sommets;
+	vector<myHalfedge*> liste_aretes;
+	vector<myFace*> liste_faces;
+
+	map<myFace*, myVertex*> centres_faces;
+	map<pair<int, int>, myVertex*> milieux_aretes;
+	map<myVertex*, myVertex*> anciens_sommets_deplaces;
+	for (size_t i = 0; i < faces.size(); i++) {
+		if (faces[i] == NULL) continue;
+
+		myHalfedge* prem_edge = faces[i]->adjacent_halfedge;
+		myHalfedge* arete_courante = prem_edge;
+		double nb_sommets = 0.0;
+		double sommeX = 0.0, sommeY = 0.0, sommeZ = 0.0;
+
+		do {
+			if (arete_courante->source && arete_courante->source->point) {
+				sommeX += arete_courante->source->point->X;
+				sommeY += arete_courante->source->point->Y;
+				sommeZ += arete_courante->source->point->Z;
+				nb_sommets += 1.0;
+			}
+			arete_courante = arete_courante->next;
+		} while (arete_courante != prem_edge && arete_courante != NULL);
+
+		if (nb_sommets > 0.0) {
+			myVertex* som_face = new myVertex();
+			som_face->point = new myPoint3D(sommeX / nb_sommets, sommeY / nb_sommets, sommeZ / nb_sommets);
+			centres_faces[faces[i]] = som_face;
+			liste_sommets.push_back(som_face);
+		}
+	}
+	for (size_t i = 0; i < halfedges.size(); i++) {
+		myHalfedge* edge_actuelle = halfedges[i];
+		if (edge_actuelle == NULL || edge_actuelle->twin == NULL) continue;
+
+		int idx1 = edge_actuelle->source->index;
+		int idx2 = edge_actuelle->twin->source->index;
+		pair<int, int> cle_directe = make_pair(idx1, idx2);
+		pair<int, int> cle_inverse = make_pair(idx2, idx1);
+
+		if (milieux_aretes.find(cle_directe) != milieux_aretes.end()) {
+			continue; 
+		}
+
+		myVertex* f_pt1 = centres_faces[edge_actuelle->adjacent_face];
+		myVertex* f_pt2 = centres_faces[edge_actuelle->twin->adjacent_face];
+
+		if (f_pt1 != NULL && f_pt2 != NULL) {
+			double moyX = (edge_actuelle->source->point->X + edge_actuelle->twin->source->point->X + f_pt1->point->X + f_pt2->point->X) * 0.25;
+			double moyY = (edge_actuelle->source->point->Y + edge_actuelle->twin->source->point->Y + f_pt1->point->Y + f_pt2->point->Y) * 0.25;
+			double moyZ = (edge_actuelle->source->point->Z + edge_actuelle->twin->source->point->Z + f_pt1->point->Z + f_pt2->point->Z) * 0.25;
+
+			myVertex* som_arete = new myVertex();
+			som_arete->point = new myPoint3D(moyX, moyY, moyZ);
+			milieux_aretes[cle_directe] = som_arete;
+			milieux_aretes[cle_inverse] = som_arete;
+			liste_sommets.push_back(som_arete);
+		}
+	}
+	vector<double> nb_voisins(vertices.size(), 0.0);
+	vector<double> accumulation_fx(vertices.size(), 0.0), accumulation_fy(vertices.size(), 0.0), accumulation_fz(vertices.size(), 0.0);
+	vector<double> accumulation_ex(vertices.size(), 0.0), accumulation_ey(vertices.size(), 0.0), accumulation_ez(vertices.size(), 0.0);
+
+	for (size_t i = 0; i < halfedges.size(); i++) {
+		myHalfedge* loop_he = halfedges[i];
+		if (loop_he == NULL || loop_he->twin == NULL) continue;
+
+		int v_idx = loop_he->source->index;
+		nb_voisins[v_idx] += 1.0;
+
+		myVertex* f_node = centres_faces[loop_he->adjacent_face];
+		if (f_node != NULL) {
+			accumulation_fx[v_idx] += f_node->point->X;
+			accumulation_fy[v_idx] += f_node->point->Y;
+			accumulation_fz[v_idx] += f_node->point->Z;
+		}
+
+		accumulation_ex[v_idx] += (loop_he->source->point->X + loop_he->twin->source->point->X) * 0.5;
+		accumulation_ey[v_idx] += (loop_he->source->point->Y + loop_he->twin->source->point->Y) * 0.5;
+		accumulation_ez[v_idx] += (loop_he->source->point->Z + loop_he->twin->source->point->Z) * 0.5;
+	}
+
+	for (size_t i = 0; i < vertices.size(); i++) {
+		myVertex* ancien_v = vertices[i];
+		if (ancien_v == NULL) continue;
+
+		double valence = nb_voisins[ancien_v->index];
+		if (valence < 3.0) valence = 3.0; 
+
+		double moy_f_x = accumulation_fx[ancien_v->index] / valence;
+		double moy_f_y = accumulation_fy[ancien_v->index] / valence;
+		double moy_f_z = accumulation_fz[ancien_v->index] / valence;
+
+		double moy_e_x = accumulation_ex[ancien_v->index] / valence;
+		double moy_e_y = accumulation_ey[ancien_v->index] / valence;
+		double moy_e_z = accumulation_ez[ancien_v->index] / valence;
+
+		double nouvX = (moy_f_x + 2.0 * moy_e_x + (valence - 3.0) * ancien_v->point->X) / valence;
+		double nouvY = (moy_f_y + 2.0 * moy_e_y + (valence - 3.0) * ancien_v->point->Y) / valence;
+		double nouvZ = (moy_f_z + 2.0 * moy_e_z + (valence - 3.0) * ancien_v->point->Z) / valence;
+
+		myVertex* som_lisse = new myVertex();
+		som_lisse->point = new myPoint3D(nouvX, nouvY, nouvZ);
+		anciens_sommets_deplaces[ancien_v] = som_lisse;
+		liste_sommets.push_back(som_lisse);
+	}
+
+	for (size_t i = 0; i < liste_sommets.size(); i++) {
+		if (liste_sommets[i] != NULL) {
+			liste_sommets[i]->index = i;
+		}
+	}
+	map<pair<int, int>, myHalfedge*> table_liaison_twins;
+
+	for (size_t i = 0; i < faces.size(); i++) {
+		myFace* f_courante = faces[i];
+		if (f_courante == NULL) continue;
+
+		myHalfedge* prem_edge = f_courante->adjacent_halfedge;
+		myHalfedge* arete_courante = prem_edge;
+		do {
+			myVertex* coin0 = centres_faces[f_courante];
+			myVertex* coin1 = milieux_aretes[make_pair(arete_courante->prev->source->index, arete_courante->source->index)];
+			myVertex* coin2 = anciens_sommets_deplaces[arete_courante->source];
+			myVertex* coin3 = milieux_aretes[make_pair(arete_courante->source->index, arete_courante->twin->source->index)];
+
+			vector<myVertex*> sommets_du_quad;
+			sommets_du_quad.push_back(coin0); sommets_du_quad.push_back(coin1);
+			sommets_du_quad.push_back(coin2); sommets_du_quad.push_back(coin3);
+
+			myHalfedge** tab_aretes_quad = new myHalfedge * [4];
+			for (int k = 0; k < 4; k++) {
+				tab_aretes_quad[k] = new myHalfedge();
+			}
+
+			myFace* nouv_face_quad = new myFace();
+			nouv_face_quad->adjacent_halfedge = tab_aretes_quad[0];
+
+			for (int k = 0; k < 4; k++) {
+				int k_suiv = (k + 1) % 4;
+				int k_prec = (k - 1 + 4) % 4;
+				tab_aretes_quad[k]->next = tab_aretes_quad[k_suiv];
+				tab_aretes_quad[k]->prev = tab_aretes_quad[k_prec];
+				tab_aretes_quad[k]->adjacent_face = nouv_face_quad;
+				myVertex* v_debut = sommets_du_quad[k];
+				myVertex* v_fin = sommets_du_quad[k_suiv];
+				tab_aretes_quad[k]->source = v_debut;
+				v_debut->originof = tab_aretes_quad[k];
+
+				pair<int, int> cle_arete = make_pair(v_debut->index, v_fin->index);
+				pair<int, int> cle_jumelle = make_pair(v_fin->index, v_debut->index);
+
+				auto search_it = table_liaison_twins.find(cle_jumelle);
+				if (search_it != table_liaison_twins.end()) {
+					tab_aretes_quad[k]->twin = search_it->second;
+					search_it->second->twin = tab_aretes_quad[k];
+				}
+				else {
+					table_liaison_twins[cle_arete] = tab_aretes_quad[k];
+				}
+				liste_aretes.push_back(tab_aretes_quad[k]);
+			}
+			liste_faces.push_back(nouv_face_quad);
+			delete[] tab_aretes_quad;
+			arete_courante = arete_courante->next;
+		} while (arete_courante != prem_edge && arete_courante != NULL);
+	}
+	clear();
+	vertices = liste_sommets;
+	halfedges = liste_aretes;
+	faces = liste_faces;
+
+	for (unsigned int i = 0; i < vertices.size(); i++) {
+		if (vertices[i] != NULL) {
+			vertices[i]->index = i;
+		}
+	}
 }
 
 
